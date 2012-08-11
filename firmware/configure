@@ -1,0 +1,173 @@
+#!/bin/bash
+
+# Name all the files that you need to check.
+SRC="\
+main.c \
+main.base.c \
+main.tests.c \
+kinematic.c \
+hexapod.h \
+Makefile.base \
+Makefile.math \
+i2c/i2c.c \
+i2c/i2c.h \
+srf02/srf02.c \
+srf02/srf02.h \
+USART/txstr.c \
+USART/usart.c \
+USART/usart.h \
+USART/tx.c \
+USART/rx.c"
+
+echo "** Create Hexapod Firmware **"
+
+if [ -n "$1" ]
+then
+	echo -n "Detecting configuration ... "
+else 
+	echo "failed"
+	echo "ERROR: no configuration selected. Use 'worklog', 'tests', 'math', 'base', 'check'. Bailing out."
+	exit -1
+fi
+
+if  echo "$1" | grep -q "check" 
+then
+	configuration="check"
+fi
+
+if  echo "$1" | grep -q "tests" 
+then
+	cp -f Makefile.tests Makefile
+	configuration="tests"
+fi
+
+if  echo "$1" | grep -q "math" 
+then
+	cp -f Makefile.math Makefile
+	configuration="math"
+fi
+
+if  echo "$1" | grep -q "base" 
+then
+	cp -f Makefile.base Makefile
+	configuration="base"
+fi
+
+if echo "$1" | grep -q "program"
+then
+	configuration="program"
+fi
+
+if echo "$1" | grep -q "worklog"
+then
+	cat worklog
+	exit 1
+fi
+
+if [ -n "$configuration" ]
+then
+	echo " OK"
+	echo "Looks good, using configuration: $configuration"
+else
+	echo " failed"
+	echo "ERROR: unknown configuration selected. Supported is 'tests', 'math', 'base', 'check', 'program'. Bailing out."
+	exit -1
+fi
+
+#
+# List all the files here ...
+#
+for file in $SRC
+do
+	echo -n "checking $file ... "
+	if [ -f $file ]
+	then
+		echo " OK"
+	else
+		echo " failed"
+		echo "Perform svn checkout command first"
+		exit -1
+	fi
+done
+
+if echo "$configuration" | grep -q "check" 
+then
+	echo "** STOP here: all OK **"
+	exit -1
+fi
+
+if echo "$configuration" | grep -q "program"
+then
+	if [ -f "main.eep.hex" ]
+	then
+		if [ -f "main.hex" ]
+		then
+			echo "INFO: $configuration routine for main.eep.hex ... OK"
+			configuration="make program"
+			$configuration 
+			exit 0
+		else
+			echo "ERROR: main.hex not found, check the build process"
+			exit -1;
+		fi	
+	else
+		echo "ERROR: main.eep.hex not found, check the build process"
+		exit -1;
+	fi
+fi
+
+if echo "$configuration" | grep -q "tests"
+then
+	if [ -f "Makefile" ]
+	then
+		ANS=`diff -q Makefile.tests Makefile`
+		if echo "$ANS" | grep -q "differ"
+		then
+			echo "Error, the makefile is wrong. Cannot clobber the original Makefile. Delete it manually and re-run this."
+			exit -1;
+		fi
+	else
+		echo "Error, the makefile does not exist. Check write permissions and re-run this."
+		exit -1;
+	fi
+fi
+
+if echo "$configuration" | grep -q "math"
+then
+	if [ -f "Makefile" ]
+	then
+		ANS=`diff -q Makefile.math Makefile`
+		if echo "$ANS" | grep -q "differ"
+		then
+			echo "Error, the makefile is wrong. Cannot clobber the original Makefile. Delete it manually and re-run this."
+			exit -1;
+		fi
+	else
+		echo "Error, the makefile does not exist. Check write permissions and re-run this."
+		exit -1;
+	fi
+fi
+
+if echo "$configuration" | grep -q "base"
+then
+	if [ -f "Makefile" ]
+	then
+		ANS=`diff -q Makefile.base Makefile`
+		if echo "$ANS" | grep -q "differ"
+		then
+			echo "Error, the makefile is wrong. Cannot clobber the original Makefile. Delete it manually and re-run this."
+			exit -1;
+		fi
+	else
+		echo "Error, the makefile does not exist. Check write permissions and re-run this."
+		exit -1;
+	fi
+fi
+
+
+echo "Makefile for configuration $configuration has been created. Use command"
+echo " "
+echo "   make [debug|release|program]"
+echo " "
+echo "to build and solution and program the processor with the hexapod firmware."
+echo "** configuration finished OK **"
